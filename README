@@ -1,0 +1,399 @@
+
+	====================================
+	===  PySSH Library Documentation ===
+	====================================
+
+
+Author	:	Darius Juodokas, a.k.a. netikras
+Email 	:	dariuxas@gmail.com
+Website	:	----none----
+Release	:	v1.0
+Rel.date:	2014-12-20
+
+
+=============
+==         ==
+=== About ===
+==         ==
+=============
+
+This is a very first official release of this particular PySSH library 
+for python. It's writen using python v2.7/3, but intension was to make 
+it work on older versions, such as 2.6. What this library is is just a 
+simple built-in ssh client wrapper with some nifty functionalities. User
+can make his ssh connection auto-login (daah... what ssh wrappers do not
+have this function these days?), make it accessible for other system 
+users or even control it via network using sockets (though not TLS/SSL 
+secure...). And this is not all of it! Read further and tune this 
+library for your needs.
+
+
+=================
+==             ==
+=== Functions ===
+==             ==
+=================
+
+* SSH wrapping
+* auto-loging-in with username and password
+* sendLine()/(True) method
+* interactive mode
+* secure multiuser control of the session
+* multiuser live output preview
+* input + output logging capability [alltogether]
+* ability to send locally stored scripts to live session
+* Commands Interpreter prompt with built-in functions:
+	- help		-	displays help page
+	- set		- 	sets some variables
+	- show		-	shows some information
+	- send		-	sends something to remote host
+	- attach	-	attach nother session
+	- exit/x	-	close sesion
+
+
+=================================
+==                             ==
+=== Methods, variables, flags ===
+==                             ==
+=================================
+
+Let's start with variables.
+
+++++++++++++++++++++++++++++
+++++++++ VARIABLES +++++++++
+++++++++++++++++++++++++++++
+
+
+
+
+
+				**** Essentials ****
+				
+These variables are essential for any connection. They can be passed to 
+constructor:
+	def __init__(self, host='', user='', pswd='', port=''):
+or modified after object creation
+
+host 		- a hostname user will be logging to. It can be anything ssh 
+				would understand: 	FQDN, hostname, IP, etc.. 
+				Default value is whatever socket.gethostname() returns 
+				(in other words - localhost)
+port		- a port through which you intend to connect. 
+				Default value is default ssh port: 22
+user		- username that will be used for ssh connection. 
+				Default value is name of the user calling the script
+pswd		- a password to be used during ssh connection. 
+				Default value is '' (none)
+
+
+
+
+
+
+
+				**** ssh related ****
+				
+These variables are used by the SSH session itself.
+
+prompts		- a list (dict) of shell prompts predefined for different 
+				shells (the PS1 variable). Key is shell name and value 
+				is desired PS1 variable value. 
+testLine	- a dummy line that will be echoed to terminal to make sure 
+				autologin succeeded. By default it's set to some random 
+				hash - feel free to set it to anything more suitable 
+				for you.
+ssh_path	- path to ssh executable file
+ssh_params	- a touple of additional parameters that will be passed to 
+				ssh command during execution. Default value is: 
+				("PySSH", "-e", "~", "-p", port, "-l", user, "-q", host)
+
+
+
+
+
+
+
+				**** TIMEOUTS ****
+
+TIMEOUT_login	- This timeout value will be used for auto-logging-in 
+					to the server. After this many seconds PySSH will 
+					not longer wait for any sane signs of shell prompt. 
+					Default value is 30 seconds
+TIMEOUT_command	- This timeout value will be used while waiting for 
+					output of command manually run on the host.
+TIMEOUT_select_read	- This many seconds READER thread will wait for any 
+					output. After that it will simply skip one iteration 
+					and contnue on another one. 
+					Default value is 30 seconds
+
+
+
+
+
+
+
+
+				**** Attaching related ****
+				
+These variables are used by setAltPipes() method when user wants to 
+allow others to attach to live session
+
+attach_passphrase	- session password used for attaching. Passphrase 
+						does not have to be the same as ssh password. 
+						You can set it to anything you like. If 
+						concurrent client enters a correct passphrase 
+						he gains Read+Write permission for the session 
+						and can run commands himself. Default value, 
+						however, is ssh session password. Do not reveal 
+						this password to anyone. If you intend to allow 
+						someone to get -rw acces to a session better set 
+						your custom passphrase via Commands Interpreter.
+a_fd_expiry_timeout	- After this many seconds of inactivity -rw 
+						permissions will be revoked from attached 
+						client. After that session passphrase will have 
+						to be entered again. Default value is 60 seconds
+allowed_client_users  - a list ([..., ...]) of users (usernames) that 
+						are allowed to attach in -rw mode. User must 
+						know a correct session passphrase AND be 
+						included in this list to be able to get -rw 
+						permissions. Remember, -ro permissions are 
+						default and unrestricted. By default this list 
+						contains user using this library (process owner)
+attached_clients	- a list (dict) of client users currently attached 
+						to this session. Spectators are not included 
+						unless they had attached in -rw mode before. 
+						In other words user will appear in this list 
+						once it attaches in -rw. By default this list is
+						empty. 
+						List structure:
+							{fd : [username, host, -rw(True/False)]}
+
+
+
+	
+	
+	
+	
+	
+				**** Socket related ****
+				
+These values are used only if you're using openListeningSocket() method,
+i.e. for remote control of the script.
+
+socket_connections_MAX	- how many clients at most will be allowed to be
+							connected at the same time to the same 
+							session via network. 
+							Default value is 5
+socket_port				- port on which clients will be listened for new
+							connections (for remote control). 
+							Default value is 12347
+socket_ip				- interface (IP address) new clients will be 
+							listened for connections. 
+							Default is default system's IP.
+socket_lsn				- listening socket will be stored at this 
+							variable once created
+sockets_list			- list (dict type) of connected client sockets. 
+							By default this list is empty, but is 
+							updated with each and every new connection. 
+							Contents are as follows:
+							
+		{socket_obj:[remote_ip, remote_port, active=True/False], ...}
+
+
+
+
+
+
+
+
+				**** Others ****
+				
+Other variables that do not fall under any of above categories but still
+are meaningful. Usually you will not need to change any of those 
+(at least manually)
+
+readBufferSize		- size of READ buffer. Default is 1024
+DEBUG_LEVEL			- current debug level (numeric values 0-4 are 
+						meaningful). Default is 1 - only CRIT messages 
+						will be prompted.
+debug_levels		- a list (dict) of debug levels mapped to their 
+						numeric values. 
+						Default is:
+						{' ':0, 'CRIT':1, 'ERR' :2, 'WARN':3, 'INFO':4}
+LOGfile				- a file all the session will be logged to
+SIG_CLOSE			- number of signal that will be sent to ssh process 
+						on session closure. 
+						Default is 1 -- SIGHUP.
+change_PS1			- boolean variable which decides whether or not will
+						the PS1 prompt changes on successfull login
+
+
+
+
+
+
+				**** Special ****
+
+interpreterMap2		- a complex list (dict) of dicts which implements 
+						the whole CommandsInterpreter menu. It can be 
+						listed from CommandsInterpreter by running 
+						'help'. This menu is customizable. All you need 
+						is just to add elements to this list that have 
+						two keys: 
+						
+{'_run':someFunction, '_info':"Information of what this function does"}
+
+						These are key elements and shell not be ignored.
+						someFunction can be any function that takes two 
+						parameters: connection object (created from 
+						PySSH library) and command parameter which is a 
+						list of words entered to the CommandsInterpreter
+						as command. 
+						These new records can also be nested.
+						
+				e.g.: 
+				
+				conn.interpreterMap2['custom'] = {
+					'_run':runScript, 
+					'_info':"Runs custom script on remote host", 
+					'dialog':{
+						'_run':dialogFunction,
+						'_info': "Shows dialog window"
+						}
+					}
+
+
+
+
+
+
+
+
+++++++++++++++++++++++++++++
+++++++++++ FLAGS +++++++++++
+++++++++++++++++++++++++++++
+
+F_LOGGEDIN			- indicates whether you are logged in or not. 
+						Changing this value to False if it was True 
+						before will terminate some loops.
+F_QUIET				- enables quiet mode
+F_PAUSEREADER		- pauses READER thread, i.e. output will not be read
+						to screen (stdout)
+F_HANDLEALTPIPES	- indicates whether or not user wants to use 
+						alternative pipes (for multiuser sessions)
+F_CLIENTMODE		- indicates whether user is owner of the session or 
+						a client trying to attach
+F_RMTCLIENT			- enables controlling connection via socket
+F_LOGGED			- indicates whether session is being logged
+F_CLOSING			- True means that session is being terminated.
+F_SECURESOCK		- True means that TLS/SSL will be used to secure 
+						sockets
+
+
+
+
+
+
+
+++++++++++++++++++++++++++++
++++++++++ METHODS ++++++++++
+++++++++++++++++++++++++++++
+	
+openListeningSocket()
+	opens a server-side socket and starts listening for connections. 
+		Socket parameters are internal in the library and should have 
+		been set before calling this method (see above)
+
+setAltPipes(stdin='/dev/null', stdout='/dev/null', debug='/dev/null')
+	sets alternate pipes for multiuser sessions. CLIENT users can only 
+		see what's going on in the session but cannot interact unless 
+		they know passphrase for the session and are in the list of 
+		allowed users - then and only then user can access -rw mode and 
+		interact with the ssh session.
+	
+attach(stdin='/dev/null',stdout='/dev/null',debug='/dev/null',mode='ro')
+	attaches to pipes created by another process. This method enables 
+		-ro mode and user can only act as a spectator and see what is 
+		going on in the session, but cannot write anything.
+		In this case root user is not God enough and will not get any 
+		more privileged than any other user, unless it has the correct 
+		session password and is in the ALLOWED list.
+	
+sendAttachData(pw)
+	attempts to attach to the session in -rw mode. Session password must
+		be set to a correct one already and user must be in ALLOWED list 
+		to succeed this operation.
+	
+assignLogFile(filePath=None)
+	this method will enable logging of any VISIBLE information to log 
+		file provided.
+
+debugMode(level = 1)
+	change debug depth (verbosity). Effective values are 0-4, 0 being 
+		the quietest mode
+	
+_debug(line="", severity="INFO")
+	sends debug information to debug FD. Amount of that information 
+		depends on debugMode and severity value passed to _debug(). 
+		Depth-severity mapping is saves in variable debug_levels.
+	
+spawnSSH()
+	starts ssh as child process and starts controlling it. This is one 
+		of the core methods.
+	
+close()
+	Terminate this session and exit
+	
+_enableCannonical(fd, to_enable=True)
+	enable/disable canonical mode for some fd and let data fall thru it 
+		immediatelly w/o bufferring.
+	
+_enableEcho(fd, to_enable=True)
+	enable/disable terminal's echo parameter
+	
+autoLogin()
+	Automatically enter credentials to login to the server
+	
+_getOS(full=True)
+	get basic information about the host. This will run some commands so
+		you wouldn't want to run this while editing some file or so...
+	
+_printOS()
+	print basic information about the host (the one that was gathered 
+		with _getOS method)
+	
+_startReader(get_os_info=True)
+	method will start READER thread hence user will see all the output 
+		in his concole
+	
+getLine(fd=[], timeout=None, buffer_size=1)
+	get text line from some file descriptor. User can manually specify 
+		buffer size and timeout if required.
+	
+Write(fds=[], line="")
+	write some string fo some file descriptors.
+	
+sendLine(line, return_ans=False)
+	send some line to server. Do not forget that you might need to 
+		specify '\n' at the end if that's what you need... If return_ans 
+		is set to True method will wait  for output of that cmmand and 
+		return it.
+	
+interact()
+	enters interactive mode so user can directly interact with the 
+		server in Live session
+	
+_commandInterpreter()
+	method launches CommandInterpreter. It's a funky and configurable 
+		tool that enters CommandInterpreter prompt and waits user to 
+		type a CI commnd. CI can be used to launch locally predefined 
+		scripts on remote machines, control the session, it's variables,
+		such as passwords, usernames, modes, etc. CI can be entered from
+		interactive mode by pressing ^C-T. CI uses logics predefined in 
+		local variable interpreterMap2. To list CI commands enter CI 
+		from interactive mode by pressing ^C-T and type 'help' or 'help 
+		some_command_from_the_list' or 'help some_command *'.  To leave 
+		CI mode press ESC.
+	
+
+
