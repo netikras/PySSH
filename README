@@ -389,9 +389,9 @@ _commandInterpreter()
 		type a CI commnd. CI can be used to launch locally predefined 
 		scripts on remote machines, control the session, it's variables,
 		such as passwords, usernames, modes, etc. CI can be entered from
-		interactive mode by pressing ^C-T. CI uses logics predefined in 
+		interactive mode by pressing C-T (^T). CI uses logics predefined in 
 		local variable interpreterMap2. To list CI commands enter CI 
-		from interactive mode by pressing ^C-T and type 'help' or 'help 
+		from interactive mode by pressing C-T and type 'help' or 'help 
 		some_command_from_the_list' or 'help some_command *'.  To leave 
 		CI mode press ESC.
 	
